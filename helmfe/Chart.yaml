@@ -1,0 +1,9 @@
+apiVersion: v2
+name: gepardofe
+description: A Helm chart for Kubernetes
+engine: gotpl
+type: application
+
+version: 0.1.0
+
+appVersion: 1.16.0

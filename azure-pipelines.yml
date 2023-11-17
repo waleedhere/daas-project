@@ -1,0 +1,59 @@
+# Docker
+# Build and push an image to Azure Container Registry
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- none
+
+resources:
+- repo: self
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: 'a4ab4dd5-3571-4cd7-a897-07913a93e5c0'
+  imageRepository: 'gepardopoc'
+  containerRegistry: 'pocacr11.azurecr.io'
+  dockerfilePath: 'gepardo-poc-app/kanban-ui/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - checkout: "git://DevOps-as-a-Service/gepardo-poc-app"
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+
+
+    - checkout: self
+
+    - task: HelmDeploy@0
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscription: 'Gepardo(a6f413aa-1a8e-41a8-b55b-9e20f8caffec)'
+        azureResourceGroup: 'Terraform-RG'
+        kubernetesCluster: 'aks-wcluster-poc'
+        useClusterAdmin: true
+        namespace: 'poc'
+        command: 'upgrade'
+        chartType: 'FilePath'
+        chartPath: 'DevOps-as-a-Service/helmfe'
+        releaseName: '$(imageRepository)'
+        overrideValues: 'image.repository=pocacr11.azurecr.io/"$(imageRepository)",image.tag=$(Build.BuildId),namespace=poc,ingress.hosts.host="poc.gepardo.eu",ingress.secret="$(imageRepository)",name="$(imageRepository)"'
+        valueFile: 'DevOps-as-a-Service/helmfe/values.yaml'
